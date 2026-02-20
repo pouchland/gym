@@ -60,6 +60,7 @@ export function ExerciseList({ exercises: initialExercises }: ExerciseListProps)
         name: newName.trim(),
         muscle_group: newGroup,
         is_custom: true,
+        user_id: null,
       })
       .select()
       .single();

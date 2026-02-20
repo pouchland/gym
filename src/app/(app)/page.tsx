@@ -1,50 +1,54 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+import { useUsername } from "@/components/username-provider";
 import { formatDate } from "@/lib/utils";
-import { redirect } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+interface Workout {
+  id: string;
+  name: string | null;
+  started_at: string;
+  workout_sets: { id: string; reps: number | null; weight: number | null }[];
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function DashboardPage() {
+  const { username } = useUsername();
+  const [lastWorkout, setLastWorkout] = useState<Workout | null>(null);
+  const [weeklyCount, setWeeklyCount] = useState(0);
+  const supabase = createClient();
 
-  if (!user) {
-    redirect("/login");
-  }
+  useEffect(() => {
+    async function load() {
+      const { data: last } = await supabase
+        .from("workouts")
+        .select("*, workout_sets(id, reps, weight)")
+        .not("completed_at", "is", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .single();
 
-  // Get profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", user.id)
-    .single();
+      if (last) setLastWorkout(last);
 
-  // Get last workout
-  const { data: lastWorkout } = await supabase
-    .from("workouts")
-    .select("*, workout_sets(id, reps, weight)")
-    .not("completed_at", "is", null)
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .single();
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
 
-  // Get this week's workout count
-  const startOfWeek = new Date();
-  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from("workouts")
+        .select("id", { count: "exact", head: true })
+        .not("completed_at", "is", null)
+        .gte("started_at", startOfWeek.toISOString());
 
-  const { count: weeklyCount } = await supabase
-    .from("workouts")
-    .select("id", { count: "exact", head: true })
-    .not("completed_at", "is", null)
-    .gte("started_at", startOfWeek.toISOString());
+      setWeeklyCount(count ?? 0);
+    }
+    load();
+  }, [supabase]);
 
   const lastVolume = lastWorkout
     ? (lastWorkout.workout_sets ?? []).reduce(
-        (sum: number, s: { reps: number | null; weight: number | null }) =>
-          sum + (s.weight ?? 0) * (s.reps ?? 0),
+        (sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0),
         0
       )
     : 0;
@@ -53,7 +57,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">
-          Hey{profile?.display_name ? `, ${profile.display_name}` : ""}
+          Hey{username ? `, ${username}` : ""}
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Ready to train?
@@ -70,7 +74,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
           <p className="text-sm text-zinc-500">This Week</p>
-          <p className="text-3xl font-bold">{weeklyCount ?? 0}</p>
+          <p className="text-3xl font-bold">{weeklyCount}</p>
           <p className="text-xs text-zinc-400">workouts</p>
         </div>
         <Link
