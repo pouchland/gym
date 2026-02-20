@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   weeklySchedule,
@@ -28,9 +28,19 @@ const sessionColors: Record<string, string> = {
   light: "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900",
 };
 
+function calcWeight(percent: number, max: number): number {
+  return Math.round((max * percent) / 100 / 2.5) * 2.5;
+}
+
 export default function ProgramPage() {
   const [activeTab, setActiveTab] = useState<Tab>("schedule");
   const [expandedWeek, setExpandedWeek] = useState<number | null>(1);
+  const [oneRepMax, setOneRepMax] = useState<number | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("gym_bench_1rm");
+    if (stored) setOneRepMax(Number(stored));
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -60,7 +70,16 @@ export default function ProgramPage() {
       </div>
 
       {activeTab === "schedule" && (
-        <ScheduleTab expandedWeek={expandedWeek} setExpandedWeek={setExpandedWeek} />
+        <ScheduleTab
+          expandedWeek={expandedWeek}
+          setExpandedWeek={setExpandedWeek}
+          oneRepMax={oneRepMax}
+          setOneRepMax={(val) => {
+            setOneRepMax(val);
+            if (val) localStorage.setItem("gym_bench_1rm", String(val));
+            else localStorage.removeItem("gym_bench_1rm");
+          }}
+        />
       )}
       {activeTab === "studies" && <StudiesTab />}
       {activeTab === "guide" && <GuideTab />}
@@ -71,12 +90,56 @@ export default function ProgramPage() {
 function ScheduleTab({
   expandedWeek,
   setExpandedWeek,
+  oneRepMax,
+  setOneRepMax,
 }: {
   expandedWeek: number | null;
   setExpandedWeek: (w: number | null) => void;
+  oneRepMax: number | null;
+  setOneRepMax: (val: number | null) => void;
 }) {
+  const [inputValue, setInputValue] = useState(oneRepMax?.toString() ?? "");
+
   return (
     <div className="space-y-3">
+      {/* 1RM Input */}
+      <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-zinc-500">
+              Bench 1RM (kg)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              placeholder="e.g. 120"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onBlur={() => {
+                const val = parseFloat(inputValue);
+                if (val > 0) setOneRepMax(val);
+              }}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-lg font-bold outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+            />
+          </div>
+          <button
+            onClick={() => {
+              const val = parseFloat(inputValue);
+              if (val > 0) setOneRepMax(val);
+            }}
+            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            Save
+          </button>
+        </div>
+        {oneRepMax && (
+          <p className="mt-2 text-sm text-zinc-500">
+            Your 1RM: <span className="font-bold text-zinc-900 dark:text-zinc-100">{oneRepMax}kg</span>
+            {" "}&middot; Weights rounded to nearest 2.5kg
+          </p>
+        )}
+      </div>
+
       {/* Phase overview */}
       <div className="space-y-2">
         {phaseSummaries.map((phase) => (
@@ -181,11 +244,22 @@ function ScheduleTab({
                           </div>
                           <div className="ml-2 text-right shrink-0">
                             <p className="font-mono text-xs">
-                              {ex.sets}×{ex.reps} @{" "}
-                              {ex.intensityPercent1RM === "N/A"
-                                ? "RPE"
-                                : `${ex.intensityPercent1RM}%`}
+                              {ex.sets}×{ex.reps}
+                              {ex.intensityPercent1RM === "N/A" ? (
+                                <span className="text-zinc-400"> @ RPE</span>
+                              ) : oneRepMax ? (
+                                <span className="font-bold text-blue-600 dark:text-blue-400">
+                                  {" "}@ {calcWeight(ex.intensityPercent1RM as number, oneRepMax)}kg
+                                </span>
+                              ) : (
+                                <span> @ {ex.intensityPercent1RM}%</span>
+                              )}
                             </p>
+                            {ex.intensityPercent1RM !== "N/A" && oneRepMax && (
+                              <p className="text-xs text-zinc-400">
+                                {ex.intensityPercent1RM}% of {oneRepMax}kg
+                              </p>
+                            )}
                             <p className="text-xs text-zinc-400">
                               {Math.floor(ex.restSeconds / 60)}:{(ex.restSeconds % 60)
                                 .toString()
