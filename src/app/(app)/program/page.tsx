@@ -35,11 +35,12 @@ function calcWeight(percent: number, max: number): number {
 export default function ProgramPage() {
   const [activeTab, setActiveTab] = useState<Tab>("schedule");
   const [expandedWeek, setExpandedWeek] = useState<number | null>(1);
-  const [oneRepMax, setOneRepMax] = useState<number | null>(null);
+  const [oneRepMax, setOneRepMax] = useState<number | null>(120);
 
   useEffect(() => {
     const stored = localStorage.getItem("gym_bench_1rm");
     if (stored) setOneRepMax(Number(stored));
+    else localStorage.setItem("gym_bench_1rm", "120");
   }, []);
 
   return (
