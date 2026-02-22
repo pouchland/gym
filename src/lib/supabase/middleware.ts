@@ -38,6 +38,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup");
 
+  const isOnboardingPage = request.nextUrl.pathname.startsWith("/onboarding");
+
   // Redirect to login if not authenticated and trying to access app
   if (!user && !isAuthPage && !request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
@@ -50,6 +52,22 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
+  }
+
+  // Check if user needs onboarding
+  if (user && !isOnboardingPage && !isAuthPage) {
+    const { data: userStats } = await supabase
+      .from("user_stats")
+      .select("has_completed_onboarding, current_program")
+      .eq("id", user.id)
+      .single();
+
+    // Redirect to onboarding if not completed
+    if (userStats && !userStats.has_completed_onboarding) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

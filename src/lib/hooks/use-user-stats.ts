@@ -19,6 +19,9 @@ export interface UserStats {
   current_program: string;
   current_week: number;
   current_workout_number: number;
+  goals: string | null;
+  has_completed_onboarding: boolean;
+  current_program_details: any | null;
   created_at: string;
   updated_at: string;
 }
