@@ -44,13 +44,14 @@ export async function POST(request: NextRequest) {
   // Parse request body first so we have access to it in catch block
   let goals = "";
   let experience = "";
+  let availableDays = 4;
   let userStats = null;
 
   try {
     const body = await request.json();
     goals = body.goals || "";
     experience = body.experience || "";
-    const availableDays = body.availableDays || 4;
+    availableDays = body.availableDays || 4;
     userStats = body.userStats || null;
 
     if (!KIMI_API_KEY) {
