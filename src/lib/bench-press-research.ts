@@ -1747,3 +1747,11 @@ export const phaseSummaries = [
       "Minimal fatigue, maximal readiness. Monday is openers, Wednesday is optional light work, Friday is test day. You are not building strength this week; you are expressing what you have built.",
   },
 ];
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+export function calcWeight(percent: number, max: number): number {
+  return Math.round((max * percent) / 100 / 2.5) * 2.5;
+}
