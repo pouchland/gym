@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStats } from "@/lib/hooks/use-user-stats";
@@ -11,6 +11,7 @@ interface DashboardData {
   totalWorkouts: number;
   currentStreak: number;
   lastWorkout: {
+    id: string;
     name: string;
     date: string;
     completed: boolean;
@@ -28,6 +29,11 @@ export function HomeDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [weighInDue, setWeighInDue] = useState(false);
+  const [lastWeight, setLastWeight] = useState<number | null>(null);
+  const [weighInInput, setWeighInInput] = useState("");
+  const [weighInSaving, setWeighInSaving] = useState(false);
+  const [weighInDone, setWeighInDone] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -37,12 +43,49 @@ export function HomeDashboard() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setDisplayName(user?.user_metadata?.display_name || null);
     });
+    checkWeighIn();
   }, []);
+
+  const checkWeighIn = async () => {
+    const { data: logs } = await supabase
+      .from("weight_logs")
+      .select("weight_kg, logged_at")
+      .order("logged_at", { ascending: false })
+      .limit(1);
+
+    if (!logs || logs.length === 0) {
+      setWeighInDue(true);
+      return;
+    }
+
+    setLastWeight(logs[0].weight_kg);
+    const lastDate = new Date(logs[0].logged_at);
+    const daysSince = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    setWeighInDue(daysSince >= 7);
+  };
+
+  const submitWeighIn = useCallback(async () => {
+    const weight = parseFloat(weighInInput);
+    if (!weight || weight < 20 || weight > 300) return;
+
+    setWeighInSaving(true);
+    const { error } = await supabase
+      .from("weight_logs")
+      .insert({ weight_kg: weight, user_id: (await supabase.auth.getUser()).data.user?.id });
+
+    setWeighInSaving(false);
+    if (!error) {
+      setWeighInDone(true);
+      setWeighInDue(false);
+      setLastWeight(weight);
+      setWeighInInput("");
+    }
+  }, [weighInInput, supabase]);
 
   const fetchDashboardData = async () => {
     const { data: workouts } = await supabase
       .from("workouts")
-      .select("name, started_at, completed_at")
+      .select("id, name, started_at, completed_at")
       .order("started_at", { ascending: false })
       .limit(50);
 
@@ -85,6 +128,7 @@ export function HomeDashboard() {
 
     // Last workout
     const lastWorkout = workouts[0] ? {
+      id: workouts[0].id,
       name: workouts[0].name,
       date: workouts[0].started_at,
       completed: !!workouts[0].completed_at,
@@ -190,6 +234,47 @@ export function HomeDashboard() {
         </div>
       )}
 
+      {/* Weekly Weigh-In */}
+      {weighInDue && !weighInDone && (
+        <div className="rounded-xl bg-purple-50 p-4 dark:bg-purple-950">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">⚖️</span>
+            <h2 className="font-semibold text-purple-900 dark:text-purple-100">Weekly Weigh-In</h2>
+          </div>
+          <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+            {lastWeight
+              ? `Last: ${lastWeight}kg — time for your weekly check-in!`
+              : "Track your weight weekly to monitor progress toward your goals."}
+          </p>
+          <div className="flex gap-2">
+            <div className="flex flex-1 items-center gap-2">
+              <input
+                type="number"
+                step="0.1"
+                placeholder="kg"
+                value={weighInInput}
+                onChange={(e) => setWeighInInput(e.target.value)}
+                className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-base outline-none focus:border-purple-500 dark:border-purple-800 dark:bg-zinc-900"
+              />
+            </div>
+            <button
+              onClick={submitWeighIn}
+              disabled={weighInSaving || !weighInInput}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+            >
+              {weighInSaving ? "..." : "Log"}
+            </button>
+          </div>
+        </div>
+      )}
+      {weighInDone && (
+        <div className="rounded-xl bg-green-50 p-4 dark:bg-green-950">
+          <p className="text-sm font-medium text-green-700 dark:text-green-300">
+            ⚖️ Weigh-in logged: {lastWeight}kg — see you next week!
+          </p>
+        </div>
+      )}
+
       {/* Nutrition At-a-Glance */}
       {nutritionPlan && (
         <Link
@@ -232,7 +317,10 @@ export function HomeDashboard() {
 
       {/* Last Workout */}
       {data?.lastWorkout && (
-        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+        <Link
+          href={`/workout/${data.lastWorkout.id}`}
+          className="block rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-500">Last Workout</p>
@@ -245,16 +333,22 @@ export function HomeDashboard() {
                 })}
               </p>
             </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                data.lastWorkout.completed
-                  ? "bg-green-100 text-green-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
-            >
-              {data.lastWorkout.completed ? "Completed" : "In Progress"}
-            </span>
-          </div>        </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  data.lastWorkout.completed
+                    ? "bg-green-100 text-green-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
+                {data.lastWorkout.completed ? "Completed" : "In Progress"}
+              </span>
+              <svg className="size-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </Link>
       )}
 
       {/* Quick Actions */}

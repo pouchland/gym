@@ -29,25 +29,48 @@ export function AccountPage() {
     }
   }, [stats?.notification_preferences]);
 
-  // Form state
+  // Form state — initialized empty, synced via useEffect when stats load
   const [formData, setFormData] = useState({
-    gender: stats?.gender || "male",
-    age: stats?.age?.toString() || "",
-    height: stats?.height_cm?.toString() || "",
-    bodyweight: stats?.bodyweight_kg?.toString() || "",
-    activityLevel: stats?.activity_level || "moderate",
-    experience: stats?.training_experience || "beginner",
-    bench1RM: stats?.bench_press_1rm?.toString() || "",
-    bench8RM: stats?.bench_press_8rm?.toString() || "",
-    squat1RM: stats?.squat_1rm?.toString() || "",
-    squat8RM: stats?.squat_8rm?.toString() || "",
-    deadlift1RM: stats?.deadlift_1rm?.toString() || "",
-    deadlift8RM: stats?.deadlift_8rm?.toString() || "",
-    ohp1RM: stats?.overhead_press_1rm?.toString() || "",
-    ohp8RM: stats?.overhead_press_8rm?.toString() || "",
-    currentWeek: stats?.current_week?.toString() || "1",
-    currentWorkout: stats?.current_workout_number?.toString() || "1",
+    gender: "male" as string,
+    age: "",
+    height: "",
+    bodyweight: "",
+    activityLevel: "moderate" as string,
+    experience: "beginner" as string,
+    bench1RM: "",
+    bench8RM: "",
+    squat1RM: "",
+    squat8RM: "",
+    deadlift1RM: "",
+    deadlift8RM: "",
+    ohp1RM: "",
+    ohp8RM: "",
+    currentWeek: "1",
+    currentWorkout: "1",
   });
+
+  // Sync form state when stats load
+  useEffect(() => {
+    if (!stats) return;
+    setFormData({
+      gender: stats.gender || "male",
+      age: stats.age?.toString() || "",
+      height: stats.height_cm?.toString() || "",
+      bodyweight: stats.bodyweight_kg?.toString() || "",
+      activityLevel: stats.activity_level || "moderate",
+      experience: stats.training_experience || "beginner",
+      bench1RM: stats.bench_press_1rm?.toString() || "",
+      bench8RM: stats.bench_press_8rm?.toString() || "",
+      squat1RM: stats.squat_1rm?.toString() || "",
+      squat8RM: stats.squat_8rm?.toString() || "",
+      deadlift1RM: stats.deadlift_1rm?.toString() || "",
+      deadlift8RM: stats.deadlift_8rm?.toString() || "",
+      ohp1RM: stats.overhead_press_1rm?.toString() || "",
+      ohp8RM: stats.overhead_press_8rm?.toString() || "",
+      currentWeek: stats.current_week?.toString() || "1",
+      currentWorkout: stats.current_workout_number?.toString() || "1",
+    });
+  }, [stats]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
