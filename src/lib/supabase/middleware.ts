@@ -6,7 +6,7 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
-  createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
@@ -29,11 +29,24 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Redirect auth pages to home (auth is disabled)
-  if (
+  // Check auth status
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const isAuthPage =
     request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup")
-  ) {
+    request.nextUrl.pathname.startsWith("/signup");
+
+  // Redirect to login if not authenticated and trying to access app
+  if (!user && !isAuthPage && !request.nextUrl.pathname.startsWith("/auth")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Redirect logged-in users away from auth pages to home
+  if (user && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
