@@ -112,7 +112,7 @@ export function HomeDashboard() {
             {template?.name || "Ready to train?"}
           </p>
         </div>
-        {data?.currentStreak > 0 && (
+        {(data?.currentStreak ?? 0) > 0 && (
           <div className="text-right">
             <p className="text-3xl font-bold text-orange-500">🔥 {data.currentStreak}</p>
             <p className="text-xs text-zinc-500">day streak</p>
