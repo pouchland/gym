@@ -225,4 +225,3 @@ function generateFallbackRecommendation(goals: string, userStats: any): any {
     focus: "Balanced strength and hypertrophy",
   };
 }
-}
