@@ -1,8 +1,8 @@
 # Building Status - Walter Offline
 
-**Last Update:** 2026-02-22 18:00 CET  
-**Status:** ✅ Smart Home Dashboard Complete  
-**Next:** Exercise integration with program templates
+**Last Update:** 2026-02-22 18:15 CET  
+**Status:** ✅ Smart Home Dashboard Complete, API route fixed  
+**Next:** Populate Full Body template with actual exercises
 
 ---
 
@@ -17,15 +17,13 @@
 - Last workout summary
 - Quick action buttons (Workout/Calendar/Settings)
 
-**UX Principles Applied:**
-- One-tap to start workout
-- Visual progress (not just numbers)
-- Context-aware (time of day greeting)
-- Encouraging (streaks, goal completion)
+### API Fixes
+- Fixed missing closing brace in analyze-goals route
+- Proper function signatures
 
 ---
 
-## Building Next
+## Building Now
 
 ### Exercise Database Integration
 - Link program templates to exercise_library
@@ -33,18 +31,12 @@
 - Show exercise tips during workout
 - Equipment-based alternatives
 
-### Progress Tracking
-- Weight progression charts
-- PR detection
-- Volume tracking
-- Photo progress
-
 ---
 
 ## Commits While Offline
 
-1. `23c7f43` - Skip rest button
-2. `c678da6` - Fix missing brace
-3. `14b8211` - Program templates schema
-4. `35773ed` - Enhanced onboarding with PT guide
-5. `850c5d1` - ... (next commits)
+1. `b568153` - Smart Home Dashboard
+2. `07ab8f2` - Fix braces
+3. `e00395f` - Fix buildPrompt function
+4. `14b8211` - Program templates schema
+5. `35773ed` - Enhanced onboarding with PT guide
