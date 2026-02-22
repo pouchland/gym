@@ -52,21 +52,23 @@ export function SignupForm() {
       return;
     }
 
-    // Create user stats
-    const { error: statsError } = await supabase.from("user_stats").insert({
-      id: authData.user.id,
-      gender,
-      bodyweight_kg: bodyweight ? Number(bodyweight) : null,
-      training_experience: experience,
-      bench_press_1rm: bench1RM ? Number(bench1RM) : null,
-      bench_press_8rm: bench8RM ? Number(bench8RM) : null,
-      squat_1rm: squat1RM ? Number(squat1RM) : null,
-      squat_8rm: squat8RM ? Number(squat8RM) : null,
-      deadlift_1rm: deadlift1RM ? Number(deadlift1RM) : null,
-      deadlift_8rm: deadlift8RM ? Number(deadlift8RM) : null,
-      overhead_press_1rm: ohp1RM ? Number(ohp1RM) : null,
-      overhead_press_8rm: ohp8RM ? Number(ohp8RM) : null,
-    });
+    // Update user stats (row already created by trigger, just update it)
+    const { error: statsError } = await supabase
+      .from("user_stats")
+      .update({
+        gender,
+        bodyweight_kg: bodyweight ? Number(bodyweight) : null,
+        training_experience: experience,
+        bench_press_1rm: bench1RM ? Number(bench1RM) : null,
+        bench_press_8rm: bench8RM ? Number(bench8RM) : null,
+        squat_1rm: squat1RM ? Number(squat1RM) : null,
+        squat_8rm: squat8RM ? Number(squat8RM) : null,
+        deadlift_1rm: deadlift1RM ? Number(deadlift1RM) : null,
+        deadlift_8rm: deadlift8RM ? Number(deadlift8RM) : null,
+        overhead_press_1rm: ohp1RM ? Number(ohp1RM) : null,
+        overhead_press_8rm: ohp8RM ? Number(ohp8RM) : null,
+      })
+      .eq("id", authData.user.id);
 
     if (statsError) {
       console.error("Failed to save stats:", statsError);
