@@ -171,8 +171,9 @@ RULES:
 4. Match complexity to their experience level
 
 What plan do you recommend and why?`;
+}
 
-function generateFallbackRecommendation(goals: string, userStats: any): any {
+function generateFallbackRecommendation(goals: string, availableDays: number, userStats: any): any {
   const goalsLower = goals.toLowerCase();
   
   // Simple keyword matching fallback
@@ -224,6 +225,4 @@ function generateFallbackRecommendation(goals: string, userStats: any): any {
     duration: "45-60 minutes",
     focus: "Balanced strength and hypertrophy",
   };
-}
-
 }
