@@ -4,6 +4,42 @@ import { type NextRequest, NextResponse } from "next/server";
 const KIMI_API_KEY = process.env.KIMI_API_KEY || "";
 const KIMI_API_URL = "https://api.moonshot.cn/v1/chat/completions";
 
+// Evidence-based plan data from pt_complete_guide.md
+const planData = {
+  fullbody: {
+    days: 3,
+    science: "Best for beginners. Full body 3x/week produces faster technique improvement than 1x/week. Delivers 9-12 working sets per muscle per week.",
+  },
+  ul: {
+    days: 4,
+    science: "Upper/Lower produces ~85% of 5-day program gains with less time investment. Most efficient structure for intermediates.",
+  },
+  pplul: {
+    days: 5,
+    science: "PPLUL scores 9.0/10 on predictive hypertrophy modeling — highest of any 5-day format. Perfect middle ground.",
+  },
+  ppl: {
+    days: 6,
+    science: "6-day PPL provides twice-weekly frequency at high volume. Only works if all 6 sessions are completed consistently.",
+  },
+  bro: {
+    days: 5,
+    science: "Bro split provides high per-session intensity. Research favors 2x/week frequency, but intensity partially compensates.",
+  },
+  gvt: {
+    days: 3,
+    science: "German Volume Training: 10 sets of 10 at 60% 1RM. Extreme volume for breaking plateaus. Use as 6-8 week block only.",
+  },
+  hyrox: {
+    days: 5,
+    science: "Hyrox is fundamentally a running race (51 min avg vs 33 min on stations). VO₂max and running volume correlate strongest with finish times.",
+  },
+  "531": {
+    days: 4,
+    science: "5/3/1: Simple percentage-based progression. Gold standard for pure strength development with proven long-term results.",
+  },
+};
+
 export async function POST(request: NextRequest) {
   // Parse request body first so we have access to it in catch block
   let goals = "";
@@ -14,6 +50,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     goals = body.goals || "";
     experience = body.experience || "";
+    const availableDays = body.availableDays || 4;
     userStats = body.userStats || null;
 
     if (!KIMI_API_KEY) {
@@ -23,7 +60,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const prompt = buildPrompt(goals, experience, userStats);
+    const prompt = buildPrompt(goals, experience, availableDays, userStats);
 
     const response = await fetch(KIMI_API_URL, {
       method: "POST",
@@ -36,24 +73,41 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are a fitness expert and programming specialist. Analyze user goals and recommend the best workout plan.
+            content: `You are an expert personal trainer using evidence-based programming from peer-reviewed research.
 
-Available plans:
-- ppl: Push/Pull/Legs (6 days/week) - Best for hypertrophy, high frequency
-- ul: Upper/Lower (4 days/week) - Best for strength, balanced
-- bro: Bro Split (5-6 days/week) - One muscle per day, bodybuilding
-- fullbody: Full Body (3 days/week) - Best for beginners, strength
-- hyrox: Hyrox Training (5-6 days/week) - Functional fitness + running
-- phat: PHAT (5 days/week) - Power + hypertrophy hybrid
-- 531: 5/3/1 (4 days/week) - Pure strength, powerlifting
+CRITICAL RULES:
+1. Client can only train ${availableDays} days per week. ONLY recommend plans that fit this constraint.
+2. Adherence is the #1 variable. The best program is one the client will actually follow.
 
-Respond in JSON format:
+AVAILABLE PLANS (only recommend those with days <= ${availableDays}):
+- fullbody (3 days): Full body 3x/week. Best for beginners. Fast technique improvement. 9-12 sets/muscle/week.
+- ul (4 days): Upper/Lower split. Produces ~85% of 5-day gains. Most efficient intermediate structure.
+- pplul (5 days): Push/Pull/Legs/Upper/Lower. Highest-rated 5-day format (9.0/10 hypertrophy score).
+- ppl (6 days): Push/Pull/Legs x2. High volume, but requires strict consistency.
+- bro (5 days): One muscle per day. High intensity, good for recovery days between muscle groups.
+- gvt (3 days): German Volume Training. 10x10 at 60% 1RM. Extreme volume for plateaus. Advanced only.
+- hyrox (5 days): For Hyrox competition. Running-focused (51 min) + functional stations (33 min).
+- 531 (4 days): Jim Wendler's strength program. Percentage-based waves. Gold standard for pure strength.
+
+PROGRAMMING PRINCIPLES FROM RESEARCH:
+- Volume drives hypertrophy. 10-20 sets/muscle/week optimal.
+- Frequency matters: 2x/week > 1x/week when volume equated.
+- Progressive overload is non-negotiable.
+- Rep ranges: 1-6 strength, 6-15 hypertrophy, 15+ endurance.
+- Train 1-3 reps from failure on most sets.
+
+DECISION TREE:
+1. Days available (hard constraint)
+2. Goals (hypertrophy, strength, endurance, sport-specific)
+3. Experience (beginner = full body, intermediate = upper/lower, advanced = specialized)
+
+Respond in JSON:
 {
   "plan": "plan_id",
-  "reason": "Why this plan fits their goals (2-3 sentences)",
+  "reason": "2-3 sentences explaining WHY this fits their goals, days available, and experience. Mention specific science.",
   "frequency": "X days per week",
   "duration": "XX-XX minutes",
-  "focus": "Primary focus (e.g., hypertrophy, strength, endurance)"
+  "focus": "Primary focus (strength/hypertrophy/endurance/hybrid)"
 }`,
           },
           {
@@ -85,21 +139,24 @@ Respond in JSON format:
     
     // Return fallback recommendation
     return NextResponse.json({
-      recommendation: generateFallbackRecommendation(goals, userStats),
+      recommendation: generateFallbackRecommendation(goals, availableDays, userStats),
     });
   }
 }
 
-function buildPrompt(goals: string, experience: string, userStats: any): string {
-  return `Analyze this user's fitness goals and recommend a workout plan.
+function buildPrompt(goals: string, experience: string, availableDays: number, userStats: any): string {
+  return `You are an expert personal trainer. Recommend a workout plan based on this client profile.
 
-GOALS:
+CONSTRAINT: Client can ONLY train ${availableDays} days per week. This is non-negotiable.
+
+CLIENT GOALS:
 ${goals}
 
-EXPERIENCE:
+TRAINING EXPERIENCE:
 ${experience}
 
-STATS:
+CLIENT STATS:
+- Days available: ${availableDays}
 - Gender: ${userStats?.gender || "not specified"}
 - Bodyweight: ${userStats?.bodyweight || "not specified"}kg
 - Training Experience: ${userStats?.trainingExperience || "not specified"}
@@ -107,8 +164,13 @@ STATS:
 - Squat 1RM: ${userStats?.squat1RM || "not tested"}kg
 - Deadlift 1RM: ${userStats?.deadlift1RM || "not tested"}kg
 
-Recommend the best workout plan ID and explain why.`;
-}
+RULES:
+1. ONLY recommend plans that are ${availableDays} days or less
+2. Prioritize adherence - what will they actually stick to?
+3. Use scientific reasoning in your explanation
+4. Match complexity to their experience level
+
+What plan do you recommend and why?`;
 
 function generateFallbackRecommendation(goals: string, userStats: any): any {
   const goalsLower = goals.toLowerCase();
