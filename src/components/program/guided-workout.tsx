@@ -1,10 +1,10 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { weeklySchedule, calcWeight, type TrainingDay, type Exercise } from "@/lib/bench-press-research";
-import { useUsername } from "@/components/username-provider";
+import { useUserStats } from "@/lib/hooks/use-user-stats";
 
 interface WorkoutSet {
   id: string;
@@ -28,9 +28,12 @@ export function GuidedWorkout() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const week = Number(searchParams.get("week")) || 1;
-  const day = searchParams.get("day") as "Monday" | "Wednesday" | "Friday";
-  const { username } = useUsername();
+  const workoutNum = Number(searchParams.get("workout")) || 1;
+  const { stats, updateStats } = useUserStats();
   const supabase = createClient();
+
+  // Use transition to avoid blocking UI
+  const [isPending, startTransition] = useTransition();
 
   const [oneRepMax, setOneRepMax] = useState(100);
   const [workoutId, setWorkoutId] = useState<string | null>(null);
@@ -42,18 +45,25 @@ export function GuidedWorkout() {
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
 
+  // Map workout 1/2/3 to days
+  const workoutDayMap: Record<number, string> = { 1: "Monday", 2: "Wednesday", 3: "Friday" };
+  const dayName = workoutDayMap[workoutNum];
+
   const weekData = weeklySchedule.find(w => w.week === week);
-  const dayData = weekData?.days.find(d => d.dayOfWeek === day);
+  const dayData = weekData?.days.find(d => d.dayOfWeek === dayName);
 
   useEffect(() => {
-    const stored = localStorage.getItem("gym_bench_1rm");
-    if (stored) setOneRepMax(Number(stored));
-  }, []);
+    // Get 1RM from stats
+    if (stats?.bench_press_1rm) {
+      setOneRepMax(stats.bench_press_1rm);
+    } else if (stats?.bench_press_8rm) {
+      setOneRepMax(Math.round(stats.bench_press_8rm * 1.25));
+    }
+  }, [stats]);
 
   useEffect(() => {
     if (!dayData) return;
     
-    // Build the workout structure from the program
     const exercises: ActiveExercise[] = dayData.exercises.map((ex, exIndex) => {
       const numSets = ex.sets;
       const targetWeight = typeof ex.intensityPercent1RM === 'number' 
@@ -97,70 +107,75 @@ export function GuidedWorkout() {
     return () => clearInterval(timer);
   }, [showRestTimer, restSeconds]);
 
-  const startWorkout = useCallback(async () => {
+  // NON-BLOCKING start workout
+  const startWorkout = useCallback(() => {
     if (!dayData) return;
     
-    const { data, error } = await supabase
-      .from("workouts")
-      .insert({
-        name: `Week ${week} ${day} - ${dayData.sessionType}`,
-        user_id: null,
-        username,
-      })
-      .select("id")
-      .single();
+    // Use startTransition to mark this as non-blocking
+    startTransition(async () => {
+      const { data, error } = await supabase
+        .from("workouts")
+        .insert({
+          name: `Week ${week} Workout ${workoutNum} - ${dayData.sessionType}`,
+        })
+        .select("id")
+        .single();
 
-    if (error || !data) {
-      console.error("Failed to start workout:", error);
-      return;
-    }
+      if (error || !data) {
+        console.error("Failed to start workout:", error);
+        return;
+      }
 
-    setWorkoutId(data.id);
-    setWorkoutStarted(true);
-  }, [supabase, username, week, day, dayData]);
+      setWorkoutId(data.id);
+      setWorkoutStarted(true);
+    });
+  }, [supabase, week, workoutNum, dayData]);
 
-  const saveSet = useCallback(async () => {
+  // NON-BLOCKING save set
+  const saveSet = useCallback(() => {
     const currentExercise = activeExercises[currentExerciseIndex];
     const currentSet = currentExercise?.sets[currentSetIndex];
     
     if (!currentSet || !workoutId) return;
 
-    // Save to database
-    await supabase.from("workout_sets").insert({
-      workout_id: workoutId,
-      exercise_id: null, // Program exercises don't have IDs in exercises table
-      set_number: currentSet.setNumber,
-      reps: currentSet.actualReps,
-      weight: currentSet.actualWeight,
-      notes: `${currentExercise.exercise.name} - RPE ${currentSet.rpe || 'N/A'}`,
+    startTransition(async () => {
+      // Save to database
+      await supabase.from("workout_sets").insert({
+        workout_id: workoutId,
+        exercise_id: null,
+        set_number: currentSet.setNumber,
+        reps: currentSet.actualReps,
+        weight: currentSet.actualWeight,
+        notes: `${currentExercise.exercise.name} - RPE ${currentSet.rpe || 'N/A'}`,
+      });
+
+      // Update local state
+      setActiveExercises(prev =>
+        prev.map((ex, exI) =>
+          exI === currentExerciseIndex
+            ? {
+                ...ex,
+                sets: ex.sets.map((s, sI) =>
+                  sI === currentSetIndex ? { ...s, completed: true } : s
+                ),
+              }
+            : ex
+        )
+      );
+
+      // Start rest timer
+      const restTime = currentExercise.exercise.restSeconds;
+      setRestSeconds(restTime);
+      setShowRestTimer(true);
+
+      // Move to next set or exercise
+      if (currentSetIndex < currentExercise.sets.length - 1) {
+        setCurrentSetIndex(prev => prev + 1);
+      } else if (currentExerciseIndex < activeExercises.length - 1) {
+        setCurrentExerciseIndex(prev => prev + 1);
+        setCurrentSetIndex(0);
+      }
     });
-
-    // Update local state
-    setActiveExercises(prev =>
-      prev.map((ex, exI) =>
-        exI === currentExerciseIndex
-          ? {
-              ...ex,
-              sets: ex.sets.map((s, sI) =>
-                sI === currentSetIndex ? { ...s, completed: true } : s
-              ),
-            }
-          : ex
-      )
-    );
-
-    // Start rest timer
-    const restTime = currentExercise.exercise.restSeconds;
-    setRestSeconds(restTime);
-    setShowRestTimer(true);
-
-    // Move to next set or exercise
-    if (currentSetIndex < currentExercise.sets.length - 1) {
-      setCurrentSetIndex(prev => prev + 1);
-    } else if (currentExerciseIndex < activeExercises.length - 1) {
-      setCurrentExerciseIndex(prev => prev + 1);
-      setCurrentSetIndex(0);
-    }
   }, [activeExercises, currentExerciseIndex, currentSetIndex, workoutId, supabase]);
 
   const updateSetData = (field: keyof WorkoutSet, value: number | string) => {
@@ -178,29 +193,40 @@ export function GuidedWorkout() {
     );
   };
 
-  const finishWorkout = useCallback(async () => {
+  // NON-BLOCKING finish workout
+  const finishWorkout = useCallback(() => {
     if (!workoutId) return;
     setSaving(true);
 
-    await supabase
-      .from("workouts")
-      .update({ completed_at: new Date().toISOString() })
-      .eq("id", workoutId);
+    startTransition(async () => {
+      await supabase
+        .from("workouts")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("id", workoutId);
 
-    // Increment week if this was Friday
-    if (day === "Friday") {
-      const newWeek = Math.min(week + 1, 12);
-      localStorage.setItem("gym_bench_current_week", String(newWeek));
-    }
+      // Increment workout number, or week if workout 3 completed
+      let nextWorkout = workoutNum + 1;
+      let nextWeek = week;
+      
+      if (nextWorkout > 3) {
+        nextWorkout = 1;
+        nextWeek = Math.min(week + 1, 12);
+      }
 
-    setSaving(false);
-    router.push("/");
-  }, [workoutId, supabase, router, week, day]);
+      await updateStats({
+        current_week: nextWeek,
+        current_workout_number: nextWorkout,
+      });
+
+      setSaving(false);
+      router.push("/");
+    });
+  }, [workoutId, supabase, router, week, workoutNum, updateStats]);
 
   if (!dayData) {
     return (
       <div className="p-4">
-        <p className="text-red-500">Invalid workout day selected.</p>
+        <p className="text-red-500">Invalid workout selected.</p>
       </div>
     );
   }
@@ -210,7 +236,7 @@ export function GuidedWorkout() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Week {week} · {day}</h1>
+          <h1 className="text-2xl font-bold">Week {week} · Workout {workoutNum}</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {weekData?.phase} · {dayData.sessionType} session
           </p>
@@ -259,9 +285,10 @@ export function GuidedWorkout() {
 
         <button
           onClick={startWorkout}
-          className="w-full rounded-xl bg-blue-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-blue-700"
+          disabled={isPending}
+          className="w-full rounded-xl bg-blue-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
         >
-          Start Workout
+          {isPending ? "Starting..." : "Start Workout"}
         </button>
       </div>
     );
@@ -390,10 +417,10 @@ export function GuidedWorkout() {
           {/* Confirm Button */}
           <button
             onClick={saveSet}
-            disabled={!currentSet.actualReps || !currentSet.actualWeight}
+            disabled={!currentSet.actualReps || !currentSet.actualWeight || isPending}
             className="w-full rounded-xl bg-green-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLastSet ? "Complete Final Set" : "Complete Set"}
+            {isPending ? "Saving..." : isLastSet ? "Complete Final Set" : "Complete Set"}
           </button>
         </div>
       )}

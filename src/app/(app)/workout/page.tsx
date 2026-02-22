@@ -1,14 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { ActiveWorkout } from "@/components/workout/active-workout";
+import { WorkoutSelector } from "@/components/workout/workout-selector";
 
-export default async function WorkoutPage() {
-  const supabase = await createClient();
-
-  const { data: exercises } = await supabase
-    .from("exercises")
-    .select("*")
-    .order("muscle_group")
-    .order("name");
-
-  return <ActiveWorkout exercises={exercises ?? []} />;
+export default function WorkoutPage() {
+  return <WorkoutSelector />;
 }
