@@ -104,7 +104,7 @@ export function AccountPage() {
                 {["male", "female", "other"].map((g) => (
                   <button
                     key={g}
-                    onClick={() => setFormData({ ...formData, gender: g })}
+                    onClick={() => setFormData({ ...formData, gender: g as "male" | "female" | "other" })}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
                       formData.gender === g
                         ? "bg-blue-600 text-white"
@@ -145,7 +145,7 @@ export function AccountPage() {
                 {["beginner", "intermediate", "advanced"].map((exp) => (
                   <button
                     key={exp}
-                    onClick={() => setFormData({ ...formData, experience: exp })}
+                    onClick={() => setFormData({ ...formData, experience: exp as "beginner" | "intermediate" | "advanced" })}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
                       formData.experience === exp
                         ? "bg-blue-600 text-white"
