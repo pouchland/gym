@@ -29,7 +29,9 @@ export function HomeDashboard() {
   const supabase = createClient();
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardData().catch((err) =>
+      console.error("Failed to fetch dashboard data:", err)
+    );
   }, []);
 
   const fetchDashboardData = async () => {
@@ -48,21 +50,21 @@ export function HomeDashboard() {
     const totalWorkouts = workouts.length;
     const completedWorkouts = workouts.filter(w => w.completed_at);
     
-    // Streak calculation
+    // Streak calculation using Set for O(1) lookups
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
+    const workoutDates = new Set(
+      completedWorkouts.map(w => w.completed_at?.split("T")[0]).filter(Boolean)
+    );
+
     for (let i = 0; i < 365; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
       const dateStr = checkDate.toISOString().split("T")[0];
-      
-      const hadWorkout = completedWorkouts.some(w => 
-        w.completed_at?.startsWith(dateStr)
-      );
-      
-      if (hadWorkout) {
+
+      if (workoutDates.has(dateStr)) {
         streak++;
       } else if (i > 0) {
         break;
@@ -114,7 +116,7 @@ export function HomeDashboard() {
         </div>
         {(data?.currentStreak ?? 0) > 0 && (
           <div className="text-right">
-            <p className="text-3xl font-bold text-orange-500">🔥 {data.currentStreak}</p>
+            <p className="text-3xl font-bold text-orange-500">🔥 {data?.currentStreak}</p>
             <p className="text-xs text-zinc-500">day streak</p>
           </div>
         )}

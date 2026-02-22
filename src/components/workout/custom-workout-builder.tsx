@@ -39,7 +39,9 @@ export function CustomWorkoutBuilder() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchExercises();
+    fetchExercises().catch((err) =>
+      console.error("Failed to fetch exercises:", err)
+    );
   }, [muscleGroups]);
 
   const fetchExercises = async () => {
@@ -124,7 +126,7 @@ export function CustomWorkoutBuilder() {
     setSelectedExercises(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateExercise = (index: number, field: keyof SelectedExercise, value: any) => {
+  const updateExercise = (index: number, field: keyof SelectedExercise, value: string | number | null) => {
     setSelectedExercises(prev =>
       prev.map((ex, i) => i === index ? { ...ex, [field]: value } : ex)
     );
@@ -148,8 +150,14 @@ export function CustomWorkoutBuilder() {
       return;
     }
 
-    // Store workout structure in localStorage for the active workout
-    localStorage.setItem(`workout_${workout.id}_exercises`, JSON.stringify(selectedExercises));
+    // Store workout structure in localStorage before navigating
+    try {
+      localStorage.setItem(`workout_${workout.id}_exercises`, JSON.stringify(selectedExercises));
+    } catch (e) {
+      console.error("Failed to save workout exercises to localStorage:", e);
+      setSaving(false);
+      return;
+    }
 
     router.push(`/workout/active?id=${workout.id}`);
   }, [selectedExercises, workoutName, muscleGroups, supabase, router]);

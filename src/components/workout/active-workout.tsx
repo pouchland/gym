@@ -109,13 +109,17 @@ export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
 
       if (!set.completed && workoutId) {
         // Save to database when completing a set
-        await supabase.from("workout_sets").insert({
+        const { error } = await supabase.from("workout_sets").insert({
           workout_id: workoutId,
           exercise_id: exercise.exercise.id,
           set_number: setIndex + 1,
           reps: set.reps,
           weight: set.weight,
         });
+        if (error) {
+          console.error("Failed to save set:", error);
+          return;
+        }
       }
 
       setWorkoutExercises((prev) =>
@@ -155,10 +159,16 @@ export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
     if (!workoutId) return;
     setSaving(true);
 
-    await supabase
+    const { error } = await supabase
       .from("workouts")
       .update({ completed_at: new Date().toISOString() })
       .eq("id", workoutId);
+
+    if (error) {
+      console.error("Failed to finish workout:", error);
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     router.push(`/workout/${workoutId}`);
@@ -168,8 +178,16 @@ export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
   const cancelWorkout = useCallback(async () => {
     if (!workoutId) return;
 
-    await supabase.from("workout_sets").delete().eq("workout_id", workoutId);
-    await supabase.from("workouts").delete().eq("id", workoutId);
+    const { error: setsError } = await supabase.from("workout_sets").delete().eq("workout_id", workoutId);
+    if (setsError) {
+      console.error("Failed to delete workout sets:", setsError);
+      return;
+    }
+    const { error: workoutError } = await supabase.from("workouts").delete().eq("id", workoutId);
+    if (workoutError) {
+      console.error("Failed to delete workout:", workoutError);
+      return;
+    }
 
     setWorkoutId(null);
     setWorkoutExercises([]);

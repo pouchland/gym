@@ -530,7 +530,7 @@ export function OnboardingFlow() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold">{plan.name}</p>
-                    <p className="text-sm text-zinc-500">{plan.shortDescription || plan.description.substring(0, 60)}...</p>
+                    <p className="text-sm text-zinc-500">{plan.description.substring(0, 60)}...</p>
                   </div>
                   <span className="text-sm text-zinc-400">{plan.days}d</span>
                 </div>

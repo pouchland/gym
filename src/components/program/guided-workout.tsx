@@ -140,7 +140,7 @@ export function GuidedWorkout() {
 
     startTransition(async () => {
       // Save to database
-      await supabase.from("workout_sets").insert({
+      const { error } = await supabase.from("workout_sets").insert({
         workout_id: workoutId,
         exercise_id: null,
         set_number: currentSet.setNumber,
@@ -148,6 +148,10 @@ export function GuidedWorkout() {
         weight: currentSet.actualWeight,
         notes: `${currentExercise.exercise.name} - RPE ${currentSet.rpe || 'N/A'}`,
       });
+      if (error) {
+        console.error("Failed to save set:", error);
+        return;
+      }
 
       // Update local state
       setActiveExercises(prev =>
@@ -199,10 +203,16 @@ export function GuidedWorkout() {
     setSaving(true);
 
     startTransition(async () => {
-      await supabase
+      const { error: finishError } = await supabase
         .from("workouts")
         .update({ completed_at: new Date().toISOString() })
         .eq("id", workoutId);
+
+      if (finishError) {
+        console.error("Failed to finish workout:", finishError);
+        setSaving(false);
+        return;
+      }
 
       // Increment workout number, or week if workout 3 completed
       let nextWorkout = workoutNum + 1;
@@ -318,7 +328,11 @@ export function GuidedWorkout() {
         <div
           className="h-full rounded-full bg-blue-600 transition-all"
           style={{
-            width: `${((currentExerciseIndex * 3 + currentSetIndex) / (activeExercises.length * 3)) * 100}%`,
+            width: `${(() => {
+              const completedSets = activeExercises.slice(0, currentExerciseIndex).reduce((sum, ex) => sum + ex.sets.length, 0) + currentSetIndex;
+              const totalSets = activeExercises.reduce((sum, ex) => sum + ex.sets.length, 0);
+              return totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
+            })()}%`,
           }}
         />
       </div>

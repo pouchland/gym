@@ -163,7 +163,7 @@ export function SignupForm() {
               {["male", "female", "other"].map((g) => (
                 <button
                   key={g}
-                  onClick={() => setGender(g as any)}
+                  onClick={() => setGender(g as "male" | "female" | "other")}
                   className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
                     gender === g
                       ? "bg-blue-600 text-white"
@@ -193,7 +193,7 @@ export function SignupForm() {
               {["beginner", "intermediate", "advanced"].map((exp) => (
                 <button
                   key={exp}
-                  onClick={() => setExperience(exp as any)}
+                  onClick={() => setExperience(exp as "beginner" | "intermediate" | "advanced")}
                   className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
                     experience === exp
                       ? "bg-blue-600 text-white"

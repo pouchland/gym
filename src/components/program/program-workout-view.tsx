@@ -44,34 +44,38 @@ export function ProgramWorkoutView() {
 
   useEffect(() => {
     if (!stats?.current_program) return;
-    fetchWorkout();
+    fetchWorkout().catch((err) =>
+      console.error("Failed to fetch workout:", err)
+    );
   }, [stats]);
 
   const fetchWorkout = async () => {
     setLoading(true);
 
     // Get the current week's workout
-    const { data: weekData } = await supabase
+    const { data: weekData, error: weekError } = await supabase
       .from("program_weeks")
       .select("id")
       .eq("program_id", stats?.current_program)
       .eq("week_number", currentWeek)
       .single();
 
-    if (!weekData) {
+    if (weekError || !weekData) {
+      console.error("Failed to fetch program week:", weekError);
       setLoading(false);
       return;
     }
 
     // Get the workout for this week
-    const { data: workoutData } = await supabase
+    const { data: workoutData, error: workoutError } = await supabase
       .from("program_workouts")
       .select("*")
       .eq("week_id", weekData.id)
       .eq("workout_number", currentWorkout)
       .single();
 
-    if (!workoutData) {
+    if (workoutError || !workoutData) {
+      console.error("Failed to fetch program workout:", workoutError);
       setLoading(false);
       return;
     }

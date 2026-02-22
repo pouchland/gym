@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 // Kimi API configuration
 const KIMI_API_KEY = process.env.KIMI_API_KEY || "";
@@ -48,11 +49,29 @@ export async function POST(request: NextRequest) {
   let userStats = null;
 
   try {
+    // Auth check - only authenticated users can analyze goals
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     goals = body.goals || "";
     experience = body.experience || "";
     availableDays = body.availableDays || 4;
     userStats = body.userStats || null;
+
+    // Input validation
+    if (typeof goals !== "string" || goals.length > 2000) {
+      return NextResponse.json({ error: "Invalid goals input" }, { status: 400 });
+    }
+    if (typeof experience !== "string" || experience.length > 500) {
+      return NextResponse.json({ error: "Invalid experience input" }, { status: 400 });
+    }
+    if (typeof availableDays !== "number" || availableDays < 1 || availableDays > 7) {
+      return NextResponse.json({ error: "availableDays must be between 1 and 7" }, { status: 400 });
+    }
 
     if (!KIMI_API_KEY) {
       // Fallback if no API key
@@ -132,8 +151,13 @@ Respond in JSON:
       throw new Error("Empty response from Kimi");
     }
 
-    const recommendation = JSON.parse(content);
-    
+    let recommendation;
+    try {
+      recommendation = JSON.parse(content);
+    } catch {
+      throw new Error("Failed to parse Kimi response as JSON");
+    }
+
     return NextResponse.json({ recommendation });
   } catch (error) {
     console.error("Goal analysis error:", error);
@@ -145,7 +169,16 @@ Respond in JSON:
   }
 }
 
-function buildPrompt(goals: string, experience: string, availableDays: number, userStats: any): string {
+interface UserStats {
+  gender?: string;
+  bodyweight?: number;
+  trainingExperience?: string;
+  bench1RM?: number;
+  squat1RM?: number;
+  deadlift1RM?: number;
+}
+
+function buildPrompt(goals: string, experience: string, availableDays: number, userStats: UserStats | null): string {
   return `You are an expert personal trainer. Recommend a workout plan based on this client profile.
 
 CONSTRAINT: Client can ONLY train ${availableDays} days per week. This is non-negotiable.
@@ -174,7 +207,7 @@ RULES:
 What plan do you recommend and why?`;
 }
 
-function generateFallbackRecommendation(goals: string, availableDays: number, userStats: any): any {
+function generateFallbackRecommendation(goals: string, availableDays: number, userStats: UserStats | null) {
   const goalsLower = goals.toLowerCase();
   
   // Simple keyword matching fallback
