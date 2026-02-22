@@ -212,7 +212,7 @@ export function GuidedWorkout() {
         <div>
           <h1 className="text-2xl font-bold">Week {week} · {day}</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {dayData.phase} · {dayData.sessionType} session
+            {weekData?.phase} · {dayData.sessionType} session
           </p>
         </div>
 
