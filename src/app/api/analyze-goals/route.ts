@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     if (!KIMI_API_KEY) {
       // Fallback if no API key
       return NextResponse.json({
-        recommendation: generateFallbackRecommendation(goals, userStats),
+        recommendation: generateFallbackRecommendation(goals, availableDays, userStats),
       });
     }
 
