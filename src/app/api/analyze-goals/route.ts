@@ -5,8 +5,16 @@ const KIMI_API_KEY = process.env.KIMI_API_KEY || "";
 const KIMI_API_URL = "https://api.moonshot.cn/v1/chat/completions";
 
 export async function POST(request: NextRequest) {
+  // Parse request body first so we have access to it in catch block
+  let goals = "";
+  let experience = "";
+  let userStats = null;
+
   try {
-    const { goals, experience, userStats } = await request.json();
+    const body = await request.json();
+    goals = body.goals || "";
+    experience = body.experience || "";
+    userStats = body.userStats || null;
 
     if (!KIMI_API_KEY) {
       // Fallback if no API key
