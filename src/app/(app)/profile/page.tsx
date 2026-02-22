@@ -1,21 +1,38 @@
 "use client";
 
-import { useUsername } from "@/components/username-provider";
-import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect } from "react";
 
 export default function ProfilePage() {
-  const { username, setUsername } = useUsername();
-  const [name, setName] = useState(username ?? "");
+  const supabase = createClient();
+  const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  function handleSave(e: React.FormEvent) {
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.display_name) {
+        setName(user.user_metadata.display_name);
+      }
+      setLoading(false);
+    });
+  }, [supabase]);
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (name.trim()) {
-      setUsername(name.trim());
+    if (!name.trim()) return;
+
+    const { error } = await supabase.auth.updateUser({
+      data: { display_name: name.trim() },
+    });
+
+    if (!error) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
   }
+
+  if (loading) return <div className="p-4">Loading...</div>;
 
   return (
     <div className="space-y-4">

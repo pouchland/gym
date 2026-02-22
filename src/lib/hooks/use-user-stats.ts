@@ -3,11 +3,25 @@
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState, useCallback } from "react";
 
+export interface NotificationPreferences {
+  enabled: boolean;
+  morning_check?: string;
+  pre_workout?: string;
+  hydration?: boolean;
+  supplement?: boolean;
+}
+
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "very_active";
+
 export interface UserStats {
   id: string;
   gender: "male" | "female" | "other" | null;
   bodyweight_kg: number | null;
   training_experience: "beginner" | "intermediate" | "advanced" | null;
+  age: number | null;
+  height_cm: number | null;
+  activity_level: ActivityLevel | null;
+  notification_preferences: NotificationPreferences | null;
   bench_press_1rm: number | null;
   bench_press_8rm: number | null;
   squat_1rm: number | null;

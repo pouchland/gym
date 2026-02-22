@@ -1,9 +1,9 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useUserStats } from "@/lib/hooks/use-user-stats";
+import { useUserStats, type NotificationPreferences } from "@/lib/hooks/use-user-stats";
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export function AccountPage() {
   const { stats, loading, updateStats } = useUserStats();
@@ -14,10 +14,28 @@ export function AccountPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
+  // Notification preferences
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
+    enabled: false,
+    morning_check: "07:00",
+    pre_workout: "16:00",
+    hydration: true,
+    supplement: true,
+  });
+
+  useEffect(() => {
+    if (stats?.notification_preferences) {
+      setNotifPrefs((prev) => ({ ...prev, ...stats.notification_preferences }));
+    }
+  }, [stats?.notification_preferences]);
+
   // Form state
   const [formData, setFormData] = useState({
     gender: stats?.gender || "male",
+    age: stats?.age?.toString() || "",
+    height: stats?.height_cm?.toString() || "",
     bodyweight: stats?.bodyweight_kg?.toString() || "",
+    activityLevel: stats?.activity_level || "moderate",
     experience: stats?.training_experience || "beginner",
     bench1RM: stats?.bench_press_1rm?.toString() || "",
     bench8RM: stats?.bench_press_8rm?.toString() || "",
@@ -36,7 +54,10 @@ export function AccountPage() {
     
     const result = await updateStats({
       gender: formData.gender as "male" | "female" | "other",
+      age: formData.age ? Number(formData.age) : null,
+      height_cm: formData.height ? Number(formData.height) : null,
       bodyweight_kg: formData.bodyweight ? Number(formData.bodyweight) : null,
+      activity_level: formData.activityLevel as "sedentary" | "light" | "moderate" | "active" | "very_active",
       training_experience: formData.experience as "beginner" | "intermediate" | "advanced",
       bench_press_1rm: formData.bench1RM ? Number(formData.bench1RM) : null,
       bench_press_8rm: formData.bench8RM ? Number(formData.bench8RM) : null,
@@ -48,14 +69,15 @@ export function AccountPage() {
       overhead_press_8rm: formData.ohp8RM ? Number(formData.ohp8RM) : null,
       current_week: Number(formData.currentWeek) || 1,
       current_workout_number: Number(formData.currentWorkout) || 1,
+      notification_preferences: notifPrefs,
     });
 
     setIsSaving(false);
-    
+
     if (!result.error) {
       setIsEditing(false);
     }
-  }, [formData, updateStats]);
+  }, [formData, notifPrefs, updateStats]);
 
   const handleLogout = useCallback(async () => {
     setIsLoggingOut(true);
@@ -120,6 +142,40 @@ export function AccountPage() {
             )}
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Age</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                  placeholder="years"
+                />
+              ) : (
+                <p className="mt-1 text-base">{stats?.age ? `${stats.age} years` : "Not set"}</p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Height</label>
+              {isEditing ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={formData.height}
+                    onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                    className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    placeholder="cm"
+                  />
+                  <span className="text-zinc-500">cm</span>
+                </div>
+              ) : (
+                <p className="mt-1 text-base">{stats?.height_cm ? `${stats.height_cm} cm` : "Not set"}</p>
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Bodyweight</label>
             {isEditing ? (
@@ -135,6 +191,35 @@ export function AccountPage() {
               </div>
             ) : (
               <p className="mt-1 text-base">{stats?.bodyweight_kg ? `${stats.bodyweight_kg} kg` : "Not set"}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Activity Level</label>
+            {isEditing ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {([
+                  ["sedentary", "Sedentary"],
+                  ["light", "Light"],
+                  ["moderate", "Moderate"],
+                  ["active", "Active"],
+                  ["very_active", "Very Active"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => setFormData({ ...formData, activityLevel: value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      formData.activityLevel === value
+                        ? "bg-blue-600 text-white"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-base capitalize">{stats?.activity_level?.replace("_", " ") || "Not set"}</p>
             )}
           </div>
 
@@ -341,6 +426,103 @@ export function AccountPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold mb-4">Reminders</h2>
+
+        <div className="space-y-4">
+          <label className="flex items-center justify-between">
+            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Enable notifications
+            </span>
+            <button
+              onClick={() => setNotifPrefs((p) => ({ ...p, enabled: !p.enabled }))}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                notifPrefs.enabled ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform shadow-sm ${
+                  notifPrefs.enabled ? "translate-x-5" : ""
+                }`}
+              />
+            </button>
+          </label>
+
+          {notifPrefs.enabled && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Morning nutrition check
+                </label>
+                <input
+                  type="time"
+                  value={notifPrefs.morning_check || "07:00"}
+                  onChange={(e) =>
+                    setNotifPrefs((p) => ({ ...p, morning_check: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Pre-workout meal reminder
+                </label>
+                <input
+                  type="time"
+                  value={notifPrefs.pre_workout || "16:00"}
+                  onChange={(e) =>
+                    setNotifPrefs((p) => ({ ...p, pre_workout: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                />
+              </div>
+
+              <label className="flex items-center justify-between">
+                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Hydration reminders (every 2h)
+                </span>
+                <button
+                  onClick={() => setNotifPrefs((p) => ({ ...p, hydration: !p.hydration }))}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${
+                    notifPrefs.hydration ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform shadow-sm ${
+                      notifPrefs.hydration ? "translate-x-5" : ""
+                    }`}
+                  />
+                </button>
+              </label>
+
+              <label className="flex items-center justify-between">
+                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Daily supplement reminder
+                </span>
+                <button
+                  onClick={() => setNotifPrefs((p) => ({ ...p, supplement: !p.supplement }))}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${
+                    notifPrefs.supplement ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform shadow-sm ${
+                      notifPrefs.supplement ? "translate-x-5" : ""
+                    }`}
+                  />
+                </button>
+              </label>
+            </>
+          )}
+
+          <p className="text-xs text-zinc-400">
+            Reminders use browser notifications. You may need to allow notifications in your browser settings.
+          </p>
+        </div>
       </div>
 
       {/* Save/Cancel Buttons */}

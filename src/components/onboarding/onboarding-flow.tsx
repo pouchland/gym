@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStats } from "@/lib/hooks/use-user-stats";
+import { NutritionPreview } from "@/components/nutrition/nutrition-preview";
 
 interface OnboardingStep {
   id: string;
@@ -16,6 +17,7 @@ const steps: OnboardingStep[] = [
   { id: "goals", title: "Your Goals", description: "What do you want to achieve?" },
   { id: "experience", title: "Experience", description: "Tell us about your training history" },
   { id: "plan", title: "Your Plan", description: "We recommend a plan based on your profile" },
+  { id: "nutrition", title: "Nutrition", description: "Fueling your training plan" },
 ];
 
 // Evidence-based workout plans from pt_complete_guide.md
@@ -141,6 +143,7 @@ export function OnboardingFlow() {
   const [experience, setExperience] = useState("");
   const [loading, setLoading] = useState(false);
   const [recommendation, setRecommendation] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
   const { stats, updateStats } = useUserStats();
@@ -454,6 +457,33 @@ export function OnboardingFlow() {
     );
   }
 
+  // Step 5: Nutrition Preview
+  if (currentStep === 4 && selectedPlan) {
+    return (
+      <div className="space-y-6 max-w-lg mx-auto">
+        <div className="flex justify-center gap-2">
+          {steps.map((s, i) => (
+            <div
+              key={s.id}
+              className={`h-2 w-8 rounded-full ${
+                i === currentStep ? "bg-blue-600" : i < currentStep ? "bg-blue-300" : "bg-zinc-200"
+              }`}
+            />
+          ))}
+        </div>
+
+        <NutritionPreview
+          stats={stats}
+          selectedPlan={selectedPlan}
+          goals={goals}
+          onConfirm={() => selectPlan(selectedPlan)}
+          onBack={() => setCurrentStep(3)}
+          onUpdateStats={updateStats}
+        />
+      </div>
+    );
+  }
+
   // Step 4: Recommendation
   const recommendedPlan = workoutPlans.find(p => p.id === recommendation?.plan);
   
@@ -507,24 +537,24 @@ export function OnboardingFlow() {
           </div>
 
           <button
-            onClick={() => selectPlan(recommendedPlan.id)}
+            onClick={() => { setSelectedPlan(recommendedPlan.id); setCurrentStep(4); }}
             className="w-full rounded-lg bg-blue-600 py-3 text-white font-medium"
           >
-            Start {recommendedPlan.shortName}
+            Select {recommendedPlan.shortName}
           </button>
         </div>
       )}
 
       <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-zinc-900">
         <h3 className="text-lg font-semibold mb-4">Other Options ({availableDays} days or less)</h3>
-        
+
         <div className="space-y-3">
           {suitablePlans
             .filter(p => p.id !== recommendation?.plan)
             .map((plan) => (
               <button
                 key={plan.id}
-                onClick={() => selectPlan(plan.id)}
+                onClick={() => { setSelectedPlan(plan.id); setCurrentStep(4); }}
                 className="w-full rounded-lg border border-zinc-200 p-4 text-left hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
                 <div className="flex items-center justify-between">

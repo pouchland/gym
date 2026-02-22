@@ -17,6 +17,8 @@ export function SignupForm() {
   
   // Stats
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
+  const [age, setAge] = useState("");
+  const [height, setHeight] = useState("");
   const [bodyweight, setBodyweight] = useState("");
   const [experience, setExperience] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   
@@ -57,6 +59,8 @@ export function SignupForm() {
       .from("user_stats")
       .update({
         gender,
+        age: age ? Number(age) : null,
+        height_cm: height ? Number(height) : null,
         bodyweight_kg: bodyweight ? Number(bodyweight) : null,
         training_experience: experience,
         bench_press_1rm: bench1RM ? Number(bench1RM) : null,
@@ -173,6 +177,29 @@ export function SignupForm() {
                   {g}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Age</label>
+              <input
+                type="number"
+                placeholder="e.g., 25"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-base outline-none focus:border-blue-500 dark:border-zinc-800 dark:bg-zinc-900"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Height (cm)</label>
+              <input
+                type="number"
+                placeholder="e.g., 178"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-base outline-none focus:border-blue-500 dark:border-zinc-800 dark:bg-zinc-900"
+              />
             </div>
           </div>
 

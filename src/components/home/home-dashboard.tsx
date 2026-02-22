@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useUserStats } from "@/lib/hooks/use-user-stats";
 import { useProgramTemplate } from "@/lib/hooks/use-program-templates";
+import { generateNutritionPlan, type Gender } from "@/lib/nutrition-engine";
 
 interface DashboardData {
   totalWorkouts: number;
@@ -26,12 +27,16 @@ export function HomeDashboard() {
   const { template } = useProgramTemplate(stats?.current_program || null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     fetchDashboardData().catch((err) =>
       console.error("Failed to fetch dashboard data:", err)
     );
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setDisplayName(user?.user_metadata?.display_name || null);
+    });
   }, []);
 
   const fetchDashboardData = async () => {
@@ -99,6 +104,19 @@ export function HomeDashboard() {
     setLoading(false);
   };
 
+  const nutritionPlan = useMemo(() => {
+    if (!stats?.gender || !stats?.bodyweight_kg || !stats?.height_cm || !stats?.age) return null;
+    return generateNutritionPlan({
+      gender: stats.gender as Gender,
+      bodyweight_kg: stats.bodyweight_kg,
+      height_cm: stats.height_cm,
+      age: stats.age,
+      activity_level: stats.activity_level || "moderate",
+      current_program: stats.current_program || "ul",
+      goals: stats.goals,
+    });
+  }, [stats]);
+
   if (loading) return <div className="p-4">Loading...</div>;
 
   const currentWeek = stats?.current_week || 1;
@@ -109,7 +127,7 @@ export function HomeDashboard() {
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Good {getTimeOfDay()}! 👋</h1>
+          <h1 className="text-2xl font-bold">Good {getTimeOfDay()}{displayName ? `, ${displayName}` : ""}! 👋</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {template?.name || "Ready to train?"}
           </p>
@@ -170,6 +188,33 @@ export function HomeDashboard() {
               : `${data.weeklyProgress.target - data.weeklyProgress.completed} more to hit your goal`}
           </p>
         </div>
+      )}
+
+      {/* Nutrition At-a-Glance */}
+      {nutritionPlan && (
+        <Link
+          href="/nutrition"
+          className="block rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold">Today&apos;s Nutrition</h2>
+            <span className="text-xs text-blue-600 dark:text-blue-400">View all →</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-lg font-bold">{nutritionPlan.targets.calories.toLocaleString()}</p>
+              <p className="text-xs text-zinc-500">kcal target</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold">{nutritionPlan.targets.protein_g}g</p>
+              <p className="text-xs text-zinc-500">protein</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold">{(nutritionPlan.hydration_ml / 1000).toFixed(1)}L</p>
+              <p className="text-xs text-zinc-500">water</p>
+            </div>
+          </div>
+        </Link>
       )}
 
       {/* Quick Stats Grid */}
