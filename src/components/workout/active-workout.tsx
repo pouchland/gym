@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useUsername } from "@/components/username-provider";
 import { ExercisePicker } from "./exercise-picker";
 import { SetRow } from "./set-row";
 import type { Exercise } from "@/types/database";
@@ -30,14 +29,14 @@ export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
   );
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { username } = useUsername();
   const supabase = createClient();
   const router = useRouter();
 
   const startWorkout = useCallback(async () => {
+    // user_id is set automatically by database default (auth.uid())
     const { data, error } = await supabase
       .from("workouts")
-      .insert({ name: workoutName || "Workout", user_id: null, username })
+      .insert({ name: workoutName || "Workout" })
       .select("id")
       .single();
 
