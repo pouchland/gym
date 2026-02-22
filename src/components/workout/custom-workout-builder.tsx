@@ -87,10 +87,10 @@ export function CustomWorkoutBuilder() {
       }
 
       // Match difficulty to experience
-      const difficultyMap = { beginner: 1, intermediate: 2, advanced: 3 };
-      const userLevel = difficultyMap[userStats?.training_experience || "beginner"];
-      const diffA = difficultyMap[a.difficulty as keyof typeof difficultyMap] || 1;
-      const diffB = difficultyMap[b.difficulty as keyof typeof difficultyMap] || 1;
+      const difficultyMap: Record<string, number> = { beginner: 1, intermediate: 2, advanced: 3 };
+      const userLevel = difficultyMap[userStats?.training_experience || "beginner"] || 1;
+      const diffA = difficultyMap[a.difficulty] || 1;
+      const diffB = difficultyMap[b.difficulty] || 1;
 
       if (Math.abs(diffA - userLevel) < Math.abs(diffB - userLevel)) scoreA += 5;
       if (Math.abs(diffB - userLevel) < Math.abs(diffA - userLevel)) scoreB += 5;
