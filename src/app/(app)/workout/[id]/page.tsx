@@ -21,7 +21,7 @@ export default async function WorkoutDetailPage({
 
   const { data: sets } = await supabase
     .from("workout_sets")
-    .select("*, exercises(name, muscle_group)")
+    .select("*, exercise_library(name, muscle_group)")
     .eq("workout_id", id)
     .order("created_at");
 
@@ -34,11 +34,11 @@ export default async function WorkoutDetailPage({
   // Group sets by exercise
   const exerciseGroups: Record<string, ExerciseGroup> = {};
   for (const set of sets ?? []) {
-    const exerciseName = (set.exercises as { name: string })?.name ?? "Unknown";
+    const exerciseName = (set.exercise_library as { name: string })?.name ?? set.notes?.split(" — ")[0] ?? "Unknown";
     if (!exerciseGroups[exerciseName]) {
       exerciseGroups[exerciseName] = {
         name: exerciseName,
-        muscle_group: (set.exercises as { muscle_group: string | null })?.muscle_group,
+        muscle_group: (set.exercise_library as { muscle_group: string | null })?.muscle_group,
         sets: [],
       };
     }

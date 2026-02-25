@@ -144,6 +144,7 @@ export function OnboardingFlow() {
   const [loading, setLoading] = useState(false);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
   const { stats, updateStats } = useUserStats();
@@ -255,22 +256,31 @@ export function OnboardingFlow() {
   };
 
   const selectPlan = async (planId: string) => {
-    const selectedPlan = workoutPlans.find(p => p.id === planId);
-    
-    await updateStats({
+    setSaveError(null);
+    setLoading(true);
+    const plan = workoutPlans.find(p => p.id === planId);
+
+    const result = await updateStats({
       current_program: planId,
       current_week: 1,
       current_workout_number: 1,
       goals: goals,
       has_completed_onboarding: true,
       current_program_details: {
-        name: selectedPlan?.name,
-        days: selectedPlan?.days,
-        frequency: selectedPlan?.frequency,
-        structure: selectedPlan?.structure,
+        name: plan?.name,
+        days: plan?.days,
+        frequency: plan?.frequency,
+        structure: plan?.structure,
       },
     });
-    
+
+    setLoading(false);
+
+    if (result.error) {
+      setSaveError(`Failed to save your plan: ${result.error}`);
+      return;
+    }
+
     router.push("/");
     router.refresh();
   };
@@ -471,6 +481,12 @@ export function OnboardingFlow() {
             />
           ))}
         </div>
+
+        {saveError && (
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
+            {saveError}
+          </div>
+        )}
 
         <NutritionPreview
           stats={stats}

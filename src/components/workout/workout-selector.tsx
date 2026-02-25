@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useUserStats } from "@/lib/hooks/use-user-stats";
+import { useProgramTemplate } from "@/lib/hooks/use-program-templates";
 
 const muscleGroups = [
   { id: "chest", name: "Chest", icon: "💪", color: "bg-red-100 text-red-700" },
@@ -18,6 +19,7 @@ const muscleGroups = [
 
 export function WorkoutSelector() {
   const { stats, loading } = useUserStats();
+  const { template } = useProgramTemplate(stats?.current_program || null);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   const toggleGroup = (id: string) => {
@@ -30,6 +32,7 @@ export function WorkoutSelector() {
 
   const currentWeek = stats?.current_week || 1;
   const currentWorkout = stats?.current_workout_number || 1;
+  const hasValidProgram = stats?.current_program && stats.current_program !== "bench_press_specialization";
 
   return (
     <div className="space-y-6">
@@ -41,25 +44,40 @@ export function WorkoutSelector() {
       </div>
 
       {/* Program Workout Card */}
-      <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-950">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-            Next Program Workout
-          </h2>
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-            Week {currentWeek} · Workout {currentWorkout}
-          </span>
+      {hasValidProgram ? (
+        <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-950">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+              Next Program Workout
+            </h2>
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+              Week {currentWeek} · Workout {currentWorkout}
+            </span>
+          </div>
+          <p className="text-sm text-blue-600 dark:text-blue-300 mb-4">
+            {template?.name || stats?.current_program_details?.name || stats?.current_program}
+          </p>
+          <Link
+            href={`/workout/program?week=${currentWeek}&workout=${currentWorkout}`}
+            className="block w-full rounded-lg bg-blue-600 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            Start Program Workout
+          </Link>
         </div>
-        <p className="text-sm text-blue-600 dark:text-blue-300 mb-4">
-          Continue your bench press specialization program
-        </p>
-        <Link
-          href={`/workout/program?week=${currentWeek}&workout=${currentWorkout}`}
-          className="block w-full rounded-lg bg-blue-600 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-blue-700"
-        >
-          Start Program Workout
-        </Link>
-      </div>
+      ) : (
+        <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
+          <h2 className="text-lg font-semibold mb-2">No Program Selected</h2>
+          <p className="text-sm text-zinc-500 mb-4">
+            Set up a training program to get guided workouts tailored to your goals.
+          </p>
+          <Link
+            href="/onboarding"
+            className="block w-full rounded-lg bg-blue-600 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            Choose a Program
+          </Link>
+        </div>
+      )}
 
       {/* OR Divider */}
       <div className="flex items-center gap-4">
