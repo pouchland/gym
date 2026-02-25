@@ -82,27 +82,53 @@ export function useUserStats() {
   const updateStats = useCallback(async (updates: Partial<UserStats>) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) return { error: "Not authenticated" };
 
+      // Use update (not upsert) to avoid overwriting columns not in the payload.
+      // Upsert can reset missing columns to defaults if treated as an INSERT.
       const { data, error: updateError } = await supabase
         .from("user_stats")
-        .upsert({
-          id: user.id,
+        .update({
           ...updates,
           updated_at: new Date().toISOString(),
         })
+        .eq("id", user.id)
         .select()
         .single();
 
       if (updateError) {
+        // Row might not exist yet (trigger didn't fire) — fall back to insert
+        if (updateError.code === "PGRST116") {
+          const { data: insertData, error: insertError } = await supabase
+            .from("user_stats")
+            .insert({
+              id: user.id,
+              ...updates,
+              updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Failed to insert user stats:", insertError);
+            return { error: insertError.message };
+          }
+
+          setStats(insertData);
+          return { data: insertData };
+        }
+
+        console.error("Failed to update user stats:", updateError);
         return { error: updateError.message };
       }
 
       setStats(data);
       return { data };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Unknown error" };
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.error("updateStats error:", message);
+      return { error: message };
     }
   }, [supabase]);
 

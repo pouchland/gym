@@ -13,7 +13,24 @@ export function AccountPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // User identity (from Supabase auth)
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserEmail(user.email || null);
+        const name = user.user_metadata?.display_name || "";
+        setDisplayName(name);
+        setEditDisplayName(name);
+      }
+    });
+  }, [supabase]);
+
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
     enabled: false,
@@ -74,7 +91,21 @@ export function AccountPage() {
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
-    
+    setSaveError(null);
+
+    // Save display name to Supabase auth metadata if changed
+    if (editDisplayName !== displayName) {
+      const { error: nameError } = await supabase.auth.updateUser({
+        data: { display_name: editDisplayName },
+      });
+      if (nameError) {
+        setSaveError(nameError.message);
+        setIsSaving(false);
+        return;
+      }
+      setDisplayName(editDisplayName);
+    }
+
     const result = await updateStats({
       gender: formData.gender as "male" | "female" | "other",
       age: formData.age ? Number(formData.age) : null,
@@ -97,10 +128,12 @@ export function AccountPage() {
 
     setIsSaving(false);
 
-    if (!result.error) {
+    if (result.error) {
+      setSaveError(result.error);
+    } else {
       setIsEditing(false);
     }
-  }, [formData, notifPrefs, updateStats]);
+  }, [formData, notifPrefs, updateStats, editDisplayName, displayName, supabase]);
 
   const handleLogout = useCallback(async () => {
     setIsLoggingOut(true);
@@ -137,10 +170,43 @@ export function AccountPage() {
         )}
       </div>
 
+      {saveError && (
+        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">
+          Failed to save: {saveError}
+        </div>
+      )}
+
+      {/* Identity Section */}
+      <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+        <div className="flex items-center gap-4">
+          <div className="flex size-14 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-600 dark:bg-blue-900 dark:text-blue-300">
+            {(displayName || userEmail || "?")[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <input
+                type="text"
+                value={editDisplayName}
+                onChange={(e) => setEditDisplayName(e.target.value)}
+                placeholder="Display name"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base font-semibold outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            ) : (
+              <p className="text-lg font-semibold truncate">
+                {displayName || "No name set"}
+              </p>
+            )}
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+              {userEmail}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Profile Section */}
       <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
         <h2 className="text-lg font-semibold mb-4">Profile</h2>
-        
+
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Gender</label>
@@ -177,7 +243,7 @@ export function AccountPage() {
                   placeholder="years"
                 />
               ) : (
-                <p className="mt-1 text-base">{stats?.age ? `${stats.age} years` : "Not set"}</p>
+                <p className="mt-1 text-base">{stats?.age != null ? `${stats.age} years` : "Not set"}</p>
               )}
             </div>
             <div>
@@ -194,7 +260,7 @@ export function AccountPage() {
                   <span className="text-zinc-500">cm</span>
                 </div>
               ) : (
-                <p className="mt-1 text-base">{stats?.height_cm ? `${stats.height_cm} cm` : "Not set"}</p>
+                <p className="mt-1 text-base">{stats?.height_cm != null ? `${Number(stats.height_cm)} cm` : "Not set"}</p>
               )}
             </div>
           </div>
@@ -213,7 +279,7 @@ export function AccountPage() {
                 <span className="text-zinc-500">kg</span>
               </div>
             ) : (
-              <p className="mt-1 text-base">{stats?.bodyweight_kg ? `${stats.bodyweight_kg} kg` : "Not set"}</p>
+              <p className="mt-1 text-base">{stats?.bodyweight_kg != null ? `${Number(stats.bodyweight_kg)} kg` : "Not set"}</p>
             )}
           </div>
 
@@ -302,8 +368,8 @@ export function AccountPage() {
               </div>
             ) : (
               <div className="flex gap-4 text-sm">
-                <span>1RM: {stats?.bench_press_1rm ? `${stats.bench_press_1rm}kg` : "Not set"}</span>
-                <span>8RM: {stats?.bench_press_8rm ? `${stats.bench_press_8rm}kg` : "Not set"}</span>
+                <span>1RM: {stats?.bench_press_1rm != null ? `${Number(stats.bench_press_1rm)}kg` : "Not set"}</span>
+                <span>8RM: {stats?.bench_press_8rm != null ? `${Number(stats.bench_press_8rm)}kg` : "Not set"}</span>
               </div>
             )}
           </div>
@@ -334,8 +400,8 @@ export function AccountPage() {
               </div>
             ) : (
               <div className="flex gap-4 text-sm">
-                <span>1RM: {stats?.squat_1rm ? `${stats.squat_1rm}kg` : "Not set"}</span>
-                <span>8RM: {stats?.squat_8rm ? `${stats.squat_8rm}kg` : "Not set"}</span>
+                <span>1RM: {stats?.squat_1rm != null ? `${Number(stats.squat_1rm)}kg` : "Not set"}</span>
+                <span>8RM: {stats?.squat_8rm != null ? `${Number(stats.squat_8rm)}kg` : "Not set"}</span>
               </div>
             )}
           </div>
@@ -366,8 +432,8 @@ export function AccountPage() {
               </div>
             ) : (
               <div className="flex gap-4 text-sm">
-                <span>1RM: {stats?.deadlift_1rm ? `${stats.deadlift_1rm}kg` : "Not set"}</span>
-                <span>8RM: {stats?.deadlift_8rm ? `${stats.deadlift_8rm}kg` : "Not set"}</span>
+                <span>1RM: {stats?.deadlift_1rm != null ? `${Number(stats.deadlift_1rm)}kg` : "Not set"}</span>
+                <span>8RM: {stats?.deadlift_8rm != null ? `${Number(stats.deadlift_8rm)}kg` : "Not set"}</span>
               </div>
             )}
           </div>
@@ -398,8 +464,8 @@ export function AccountPage() {
               </div>
             ) : (
               <div className="flex gap-4 text-sm">
-                <span>1RM: {stats?.overhead_press_1rm ? `${stats.overhead_press_1rm}kg` : "Not set"}</span>
-                <span>8RM: {stats?.overhead_press_8rm ? `${stats.overhead_press_8rm}kg` : "Not set"}</span>
+                <span>1RM: {stats?.overhead_press_1rm != null ? `${Number(stats.overhead_press_1rm)}kg` : "Not set"}</span>
+                <span>8RM: {stats?.overhead_press_8rm != null ? `${Number(stats.overhead_press_8rm)}kg` : "Not set"}</span>
               </div>
             )}
           </div>
