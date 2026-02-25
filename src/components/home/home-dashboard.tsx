@@ -318,7 +318,11 @@ export function HomeDashboard() {
       {/* Last Workout */}
       {data?.lastWorkout && (
         <Link
-          href={`/workout/${data.lastWorkout.id}`}
+          href={
+            data.lastWorkout.completed
+              ? `/workout/${data.lastWorkout.id}`
+              : `/workout/program?week=${currentWeek}&workout=${currentWorkout}&resume=${data.lastWorkout.id}`
+          }
           className="block rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
         >
           <div className="flex items-center justify-between">

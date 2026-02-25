@@ -32,7 +32,7 @@ export function WorkoutSelector() {
 
   const currentWeek = stats?.current_week || 1;
   const currentWorkout = stats?.current_workout_number || 1;
-  const hasValidProgram = stats?.current_program && stats.current_program !== "bench_press_specialization";
+  const hasValidProgram = !!stats?.current_program;
 
   return (
     <div className="space-y-6">
@@ -55,7 +55,7 @@ export function WorkoutSelector() {
             </span>
           </div>
           <p className="text-sm text-blue-600 dark:text-blue-300 mb-4">
-            {template?.name || stats?.current_program_details?.name || stats?.current_program}
+            {template?.name || stats?.current_program_details?.name || (stats?.current_program === "bench_press_specialization" ? "Bench Press Specialization (12 weeks)" : stats?.current_program)}
           </p>
           <Link
             href={`/workout/program?week=${currentWeek}&workout=${currentWorkout}`}
