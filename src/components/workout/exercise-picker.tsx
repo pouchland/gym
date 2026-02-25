@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Exercise } from "@/types/database";
+
+export interface PickableExercise {
+  id: string;
+  name: string;
+  muscle_group: string | null;
+}
 
 interface ExercisePickerProps {
-  exercises: Exercise[];
-  onSelect: (exercise: Exercise) => void;
+  exercises: PickableExercise[];
+  onSelect: (exercise: PickableExercise) => void;
   onClose: () => void;
 }
 

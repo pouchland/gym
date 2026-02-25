@@ -3,12 +3,11 @@
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { ExercisePicker } from "./exercise-picker";
+import { ExercisePicker, type PickableExercise } from "./exercise-picker";
 import { SetRow } from "./set-row";
-import type { Exercise } from "@/types/database";
 
 interface WorkoutExercise {
-  exercise: Exercise;
+  exercise: PickableExercise;
   sets: {
     id: string;
     reps: number | null;
@@ -18,7 +17,7 @@ interface WorkoutExercise {
 }
 
 interface ActiveWorkoutProps {
-  exercises: Exercise[];
+  exercises: PickableExercise[];
 }
 
 export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
@@ -45,7 +44,7 @@ export function ActiveWorkout({ exercises }: ActiveWorkoutProps) {
   }, [supabase, workoutName]);
 
   const addExercise = useCallback(
-    (exercise: Exercise) => {
+    (exercise: PickableExercise) => {
       setWorkoutExercises((prev) => [
         ...prev,
         {

@@ -16,6 +16,7 @@ import {
   type Exercise as BenchExercise,
 } from "@/lib/bench-press-research";
 import Link from "next/link";
+import { ExercisePicker, type PickableExercise } from "@/components/workout/exercise-picker";
 
 interface WorkoutSet {
   id: string;
@@ -76,6 +77,8 @@ export function GuidedWorkout() {
   const [workoutError, setWorkoutError] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [oneRepMax, setOneRepMax] = useState(100);
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [libraryExercises, setLibraryExercises] = useState<PickableExercise[]>([]);
 
   // Bench press: get 1RM
   useEffect(() => {
@@ -343,6 +346,52 @@ export function GuidedWorkout() {
     );
   };
 
+  const openExercisePicker = useCallback(async () => {
+    if (libraryExercises.length === 0) {
+      const { data } = await supabase
+        .from("exercise_library")
+        .select("id, name, muscle_group")
+        .order("muscle_group")
+        .order("name");
+      setLibraryExercises(data || []);
+    }
+    setShowExercisePicker(true);
+  }, [libraryExercises, supabase]);
+
+  const addExerciseFromPicker = useCallback(
+    (exercise: PickableExercise) => {
+      const newExercise: ActiveExercise = {
+        name: exercise.name,
+        exerciseLibraryId: exercise.id,
+        restSeconds: 90,
+        intensityPercent1rm: null,
+        rpeTarget: null,
+        coachingNotes: null,
+        sets: Array.from({ length: 3 }, (_, i) => ({
+          id: crypto.randomUUID(),
+          exerciseIndex: activeExercises.length,
+          setNumber: i + 1,
+          targetReps: "8-12",
+          targetWeight: null,
+          actualReps: null,
+          actualWeight: null,
+          rpe: null,
+          completed: false,
+          notes: "",
+        })),
+      };
+      setActiveExercises((prev) => [...prev, newExercise]);
+    },
+    [activeExercises.length]
+  );
+
+  const jumpToExercise = (exI: number) => {
+    const firstIncomplete = activeExercises[exI].sets.findIndex((s) => !s.completed);
+    setCurrentExerciseIndex(exI);
+    setCurrentSetIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
+    setShowRestTimer(false);
+  };
+
   const finishWorkout = useCallback(() => {
     if (!workoutId) return;
     setSaving(true);
@@ -522,6 +571,13 @@ export function GuidedWorkout() {
               )}
             </div>
           ))}
+
+          <button
+            onClick={openExercisePicker}
+            className="w-full rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-zinc-700 dark:hover:border-blue-500"
+          >
+            + Add Exercise
+          </button>
         </div>
 
         <button
@@ -531,15 +587,26 @@ export function GuidedWorkout() {
         >
           {isPending ? "Starting..." : "Start Workout"}
         </button>
+
+        {showExercisePicker && (
+          <ExercisePicker
+            exercises={libraryExercises}
+            onSelect={addExerciseFromPicker}
+            onClose={() => setShowExercisePicker(false)}
+          />
+        )}
       </div>
     );
   }
 
   const currentExercise = activeExercises[currentExerciseIndex];
   const currentSet = currentExercise?.sets[currentSetIndex];
-  const isLastSet =
+  const isLastSetOfCurrent =
     currentExerciseIndex === activeExercises.length - 1 &&
     currentSetIndex === currentExercise?.sets.length - 1;
+  const allSetsCompleted = activeExercises.every((ex) =>
+    ex.sets.every((s) => s.completed)
+  );
 
   return (
     <div className="space-y-4">
@@ -583,7 +650,7 @@ export function GuidedWorkout() {
             {Math.floor(restSeconds / 60)}:{(restSeconds % 60).toString().padStart(2, "0")}
           </p>
           <p className="text-xs text-orange-600 dark:text-orange-400 mb-4">
-            Next: {isLastSet ? "Finish workout" : currentSetIndex < (currentExercise?.sets.length || 0) - 1 ? "Next set" : "Next exercise"}
+            Next: {isLastSetOfCurrent ? "Finish workout" : currentSetIndex < (currentExercise?.sets.length || 0) - 1 ? "Next set" : "Next exercise"}
           </p>
           <button
             onClick={() => { setShowRestTimer(false); setRestSeconds(0); }}
@@ -676,13 +743,13 @@ export function GuidedWorkout() {
             disabled={!currentSet.actualReps || !currentSet.actualWeight || isPending}
             className="w-full rounded-xl bg-green-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isPending ? "Saving..." : isLastSet ? "Complete Final Set" : "Complete Set"}
+            {isPending ? "Saving..." : isLastSetOfCurrent ? "Complete Final Set" : "Complete Set"}
           </button>
         </div>
       )}
 
       {/* Finish Workout Button */}
-      {isLastSet && currentSet?.completed && !showRestTimer && (
+      {allSetsCompleted && !showRestTimer && (
         <button
           onClick={finishWorkout}
           disabled={saving}
@@ -695,17 +762,44 @@ export function GuidedWorkout() {
       {/* Exercise List Summary */}
       <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
         <h3 className="text-sm font-medium mb-3">Workout Progress</h3>
-        <div className="space-y-2">
-          {activeExercises.map((ex, exI) => (
-            <div key={exI} className="flex items-center justify-between text-sm">
-              <span className={exI === currentExerciseIndex ? "font-semibold" : ""}>{ex.name}</span>
-              <span className="text-zinc-500">
-                {ex.sets.filter((s) => s.completed).length}/{ex.sets.length} sets
-              </span>
-            </div>
-          ))}
+        <div className="space-y-1">
+          {activeExercises.map((ex, exI) => {
+            const completedCount = ex.sets.filter((s) => s.completed).length;
+            const allDone = completedCount === ex.sets.length;
+            return (
+              <button
+                key={exI}
+                onClick={() => jumpToExercise(exI)}
+                className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+                  exI === currentExerciseIndex ? "bg-zinc-100 dark:bg-zinc-800" : ""
+                }`}
+              >
+                <span className={`${exI === currentExerciseIndex ? "font-semibold" : ""} ${allDone ? "text-green-600 dark:text-green-400" : ""}`}>
+                  {allDone ? "\u2713 " : ""}{ex.name}
+                </span>
+                <span className="text-zinc-500">
+                  {completedCount}/{ex.sets.length} sets
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        <button
+          onClick={openExercisePicker}
+          className="mt-3 w-full rounded-lg border-2 border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-zinc-700 dark:hover:border-blue-500"
+        >
+          + Add Exercise
+        </button>
       </div>
+
+      {showExercisePicker && (
+        <ExercisePicker
+          exercises={libraryExercises}
+          onSelect={addExerciseFromPicker}
+          onClose={() => setShowExercisePicker(false)}
+        />
+      )}
     </div>
   );
 }
